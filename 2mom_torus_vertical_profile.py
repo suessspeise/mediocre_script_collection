@@ -2,7 +2,6 @@
 hernan
 This plots vertical profiles from my torus test
 '''
-
 import os
 #import cdo as cdo_lib 
 #cdo = cdo_lib.Cdo()
@@ -12,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt; plt.rcdefaults()
 cmap = plt.cm.viridis
 cmap = plt.get_cmap('Greys')
+from collections.abc import Iterable # as comparison for typechecking
 
 def motivation(verbous=True):
     """
@@ -95,15 +95,15 @@ def get_dirlist(implementation,
     dirlist_matched : list[str]
         list of filenames in the directory, that fit the mask
     """
-    
     directory = basedir + implementation + '/'
     dirlist = os.listdir(path=directory)
     dirlist_matched = [file for file in os.listdir(path=directory) if all(x in file for x in mask)]
     if sort:
         dirlist_matched.sort()
     if verbous:
-        print(implementation + ", mask: " , mask , " matches ", len(dirlist_matched), " of ", len(dirlist), " files" )
-        
+        print('filelist:')
+        print("\t" + implementation + ", mask: " , mask , " matches ", len(dirlist_matched), " of ", len(dirlist), " files" )
+        print('\tfirst file in list:\n\t' + directory+dirlist_matched[0])
     return directory, dirlist_matched
 
 def plot_vertical_profile(ax, implementation, variable, color=(0.0,0.0,0.0), xlabel=True, verbous=False):
@@ -213,6 +213,22 @@ def generate_2d_data(implementation, variable, verbous=True):
         print('2d data set:', len(set_2d), 'columns,', len(set_2d[0]), 'elements/colummn')
     return array_2d, labels
 
+def itercheck(obj): 
+    """itercheck
+    
+    Identifies lists, tuples, dict, etc. but NOT string
+    
+    Parameters
+    ----------
+    obj : 
+        a object
+    Returns
+    -------
+    isiter:
+        True if iterable, but not string.
+    """
+    return not isinstance(obj, str) and isinstance(obj, Iterable)
+
 def plot_colormap(fig, ax, implementation, variable, zrange=False, xlabel=True, verbous=False, colorbar=False, cmap='magma'):
     """plot_colormap
     
@@ -225,8 +241,9 @@ def plot_colormap(fig, ax, implementation, variable, zrange=False, xlabel=True, 
         figure object to apply colorbar
     ax: :class: atplotlib.axes._subplots.AxesSubplot
         ax object to plot data into
-    implementation : str
-        key for used implementation (e.g. 'fortran', 'python')
+    implementation : str or list[str]
+        key for used implementation (e.g. 'fortran', 'python'), 
+        if a list or tuple is given, the difference of the first two entries will be used
     variable : str
         short name of the variable, to be extracted
     zrange : tuple[float]
@@ -240,15 +257,18 @@ def plot_colormap(fig, ax, implementation, variable, zrange=False, xlabel=True, 
     cmap: str, defaults to 'magma'
         used colormap, see https://matplotlib.org/stable/tutorials/colors/colormaps.html
     """
-    if implementation == 'diff':
-        d1, ticks = generate_2d_data('fortran', variable, verbous=verbous)
-        d2, ticks = generate_2d_data('python', variable, verbous=verbous)
+    if itercheck(implementation) : # multiple data sets, given -> generate deltas
+        d1, ticks = generate_2d_data(implementation[0], variable, verbous=verbous)
+        d2, ticks = generate_2d_data(implementation[1], variable, verbous=verbous)
         data = abs(d2 - d1)
-    else:
+        if verbous: print('maximum difference:', np.max(data))
+        ax.title.set_text('diff (max: ' + str(np.max(data)) + ')')
+    else: # single data set
         data, ticks = generate_2d_data(implementation, variable, verbous=verbous)
+        ax.title.set_text(implementation)
     
     ax.set_ylabel('height level')
-    ax.title.set_text(implementation)
+    #ax.title.set_text(implementation)
     #ax.invert_yaxis() # ax.set_ylim does this job
     ax.set_ylim([70-1,40])
     
@@ -261,7 +281,7 @@ def plot_colormap(fig, ax, implementation, variable, zrange=False, xlabel=True, 
         input_dict['vmax']=zrange[1]
     pp = ax.imshow(**input_dict)
     
-    if colorbar:
+    if colorbar: 
         fig.colorbar(pp,ax=ax)
     if xlabel:
         old_ticks = ax.get_xticks()
@@ -274,15 +294,18 @@ def plot_colormap(fig, ax, implementation, variable, zrange=False, xlabel=True, 
     else:
         ax.set_xticklabels([])
     
-def plot_colormap_comparison(variable, colorbar=False, cmap='magma'):
+def plot_colormap_comparison(variable, data_set, colorbar=False, cmap='magma'):
     """plot_colormap
     
-    produces a colormap comparison plot for python vs. fortran
+    produces a colormap comparison plot of one variable in two implementations.
 
     Parameters
     ----------
     variable : str
         short name of the variable, to be extracted
+    data_set[0] : list[str]
+        the two identifiers of simulation runs to be used, i.e. the identifying 
+        part of their directory, or EXPNAME as defined in the run script
     colorbar: bool, defaults to False
         whether colorbar on z-scale is included
     cmap: str, defaults to 'magma'
@@ -290,22 +313,30 @@ def plot_colormap_comparison(variable, colorbar=False, cmap='magma'):
     """
     fig, axs = plt.subplots(3, 1, sharex=True)
     fig.suptitle('2mom torus test: ' + get_long_name(variable), fontsize=12)
-    d1, dummy = generate_2d_data('python', variable)
-    d2, dummy = generate_2d_data('fortran', variable)
-    #zmax = max(np.maximum(d1), np.maximum(d2))
-    print('type(d1)',type(d1), 'd1.shape', d1.shape )
-    print('np.max(d1)', np.max(d1), np.max(d2))
-    #zrange=(0,zmax)
-    zrange=False
-    print('zrange', zrange)
-    plot_colormap(fig, axs[0], 'fortran', variable, zrange=zrange, colorbar=colorbar, cmap=cmap, xlabel=False)
-    plot_colormap(fig, axs[1], 'python',  variable, zrange=zrange, colorbar=colorbar, cmap=cmap, xlabel=False)
-    plot_colormap(fig, axs[2], 'diff',    variable, zrange=zrange, colorbar=colorbar, cmap=cmap)
+    # define a uniform scale for the colorbar:
+    if colorbar:
+        d1, dummy = generate_2d_data(data_set[0], variable)
+        d2, dummy = generate_2d_data(data_set[1], variable)
+        zrange=(0,max(np.max(d1), np.max(d2)))
+    else:
+        zrange=False
+    # plot
+    plot_colormap(fig, axs[0], data_set[0], variable,              
+                  zrange=zrange, colorbar=colorbar, cmap=cmap, xlabel=False)
+    plot_colormap(fig, axs[1], data_set[1],  variable,             
+                  zrange=zrange, colorbar=colorbar, cmap=cmap, xlabel=False)
+    plot_colormap(fig, axs[2], (data_set[0],data_set[1]), variable, 
+                  zrange=zrange, colorbar=colorbar, cmap=cmap)
 
 def todo():
     print('additional plot with differences')
 
-# precipitation: qr,qs,qh,qg
-# contents: cli, clw, hus
-plot_colormap_comparison('qr', cmap='Blues', colorbar=True)
-plt.show()
+if __name__ == "__main__"
+    # precipitation: qr,qs,qh,qg
+    # contents: cli, clw, hus
+
+    #plot_colormap_comparison('qr', cmap='Blues', colorbar=True)
+    #plt.show()
+    #plot_colormap_comparison('qr', ['fort_000', 'fort_001'], cmap='Blues', colorbar=True)
+    plot_colormap_comparison('qr', ['pntr_000', 'pntr_001'], cmap='Blues', colorbar=True)
+    plt.show()
