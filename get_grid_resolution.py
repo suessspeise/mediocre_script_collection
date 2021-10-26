@@ -4,6 +4,8 @@
 #  - triangle edge length or
 #  - triangle surface area or
 #  - the edge length of a equivalent square (with the same surface as the triangle)
+#
+# The real author of this code is Tobias Kölling. Thank you Tobi.
 
 import xarray as xr
 import numpy as np
