@@ -1,6 +1,10 @@
 # function intended to be added to .bashrc or .profile
 skeleton(){
-        FILE_PATH="$1.sh"
+        if test -z "$1" ; then
+                FILE_PATH="skeleton.sh"
+        else
+                FILE_PATH="$1.sh"
+        fi
         echo '' > ${FILE_PATH}
         cat >> "${FILE_PATH}" << EOF
 #!/bin/bash
