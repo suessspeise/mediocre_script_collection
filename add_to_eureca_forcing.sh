@@ -6,11 +6,17 @@
 #SBATCH --time=02:00:00
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=hernan.campos@mpimet.mpg.de
-#SBATCH --output=log/%x.%j.log
-#SBATCH --error=log/%x.%j.log
+#SBATCH --output=%x.%j.log
+#SBATCH --error=%x.%j.log
 
 # REQUIRES A LOCAL COPY OF FILES here:
 workingdir='/work/mh0926/m300872/eureca4K/'
+# this can be done like this....:
+# eurecapath='/work/mh0010/m300408/DVC-test/EUREC4A-ICON/EUREC4A'
+# cp -r $eurecapath/initc/ ./
+# cp -r $eurecapath/latbc ./
+# cp -r $eurecapath/sst_sic/ ./
+
 
 # debugging
 #shopt -s expand_aliases
