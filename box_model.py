@@ -68,24 +68,24 @@ delta, c_star = sym.symbols('\delta, c_*')
 # values those symbols that are constants or parameters to be set
 constants = {
     chi    : 1.8, # scaling factor for soil carbon lifetime decrease. empirically set to 1.8 (S
-    tau_l0 : 41, # years
-    C_l0   : 2460,  # GtCO2 tuned to get rid of initial exchange
+    tau_l0 : 41, # years 
     # C_l0   : 2500,  # GtCO2 (Sec 7.1)  
+    C_l0   : 2460,  # GtCO2 tuned to get rid of initial exchange
     preInd : 60, # GtC/yr
     beta_P : 0.4, # co2 fertilisation factor
-    # C_a0   : 37000 / 7, # GtC, as 1/7 of ocean reservoir as given in paragraph 7.2
+    # C_a0   : 37000 / 7, # GtC, estimate as 1/7 of ocean reservoir as given in paragraph 7.2
     C_a0   : 2.12 * 280,
     k_a    : 2.12, # GtC/ppm (page 41)
     # k_o    : 2.12 * (1-1/7)/(1/7) * 0.015,
     # k_o    : 2.12, # proposed by Victor
     k_o    : 2.0421, # also proposed by Victor via Mattermost, apparentyl the equation missed a Revelle factor
     gam    : 0.005, # GtC/year/ppm
-    t_opt  : 250,  # years, time scale of emission 
+    t_opt  : 250,  # years, time scale of emission
     A_tot  : 5000,  # GtC total emission
+    # A_tot  : 100000,  # GtC total emission
     delta  : 0.015,  # Surface ocean fraction
     # eta_C  : 60e-12,  # [s^-1] Surface-deep ocean carbon exchange coefficient
     eta_C  : sec2yr(60e-12), # [yr^-1] Surface-deep ocean carbon exchange coefficient
-    # eta_H  : 0.9, # enthalpy exchange coefficient
     # eta_H  : 1, # enthalpy exchange coefficient
     eta_H  : 0.73, # enthalpy exchange coefficient, as proposed by Moritz
     beta   : 5.77, # W m-2 ; CO2 radiative forcing strength
@@ -195,8 +195,10 @@ landcarbon = land_carbon_uptake()
 emission = anthropogenic_emission()
 # emission = no_emission()
 # emission = instantaneous_emission()
+
 # boxes['atmosphere'].add('C', 280 * constants[k_a])
 # print(f"boxes['atmosphere'].add('C', {280 * constants[k_a]})")
+
 flux_s2d = carbon_flux_surface_deep()
 
 
@@ -216,18 +218,16 @@ step_length = 1
 t_end = 2000
 t_end = 3000
 t_end = 4000
-t_end = 10000
-t_end = 250
+# t_end = 10000
+# t_end = 250
     
     
 for t in range(t_end):
-    
     # write output in the beginning to capture t = 0
     times.append(t * step_length)
     for key in output.keys():
         output[key]['values'].append(boxes[output[key]['box']].get(output[key]['var']) )
     
-
     deltas = dict()
     for key in boxes.keys():
         deltas[key] = Delta(boxes[key], step_length)
@@ -238,7 +238,8 @@ for t in range(t_end):
     radiation = surface_radiation(boxes['surface ocean'].get('T'), 
                               boxes['deep ocean'].get('T'), 
                               boxes['atmosphere'].get('C') )
-    # add
+# for uncoupling reomve this (temp):
+    # add temperature to deltas
     deltas['deep ocean'   ].add('T',   exchange)
     deltas['surface ocean'].add('T', - exchange)
     deltas['surface ocean'].add('T',   radiation)
@@ -250,6 +251,7 @@ for t in range(t_end):
     oceanflux = flux_s2d( boxes['surface ocean'].get('C'), boxes['deep ocean'].get('C') )
     land_carb = landcarbon(boxes['land'].get('C'), boxes['surface ocean'].get('C'), boxes['surface ocean'].get('T'))
     ocean_atmosphere = J( boxes['atmosphere'].get('C'), boxes['surface ocean'].get('C') )
+# or this (carbon):
     deltas['deep ocean'   ].add('C',   oceanflux)
     deltas['surface ocean'].add('C', - oceanflux)
     deltas['surface ocean'].add('C', ocean_atmosphere)
@@ -270,17 +272,17 @@ def plot_model():
     fig, axs  = plt.subplots(1,2, figsize=(10,5))
     # for i, y in enumerate([ys,yd]): ax.plot(x,y, label=str(i))#, color=i/len(yy))
     ax = axs[0]
-    ax.plot(times,output['T_s']['values'],label=f"surface ocean ({output['T_s']['values'][-1]:.2f} K)",color='lightblue')
-    ax.plot(times,output['T_d']['values'],label=f"deep ocean ({output['T_d']['values'][-1]:.2f} K)",color='darkblue')
+    ax.plot(times,output['T_s']['values'],label=f"surface ocean \n(max:{np.max(output['T_s']['values']):.2f} K; last: {output['T_s']['values'][-1]:.2f} K)",color='lightblue')
+    ax.plot(times,output['T_d']['values'],label=f"deep ocean \n(max:{np.max(output['T_d']['values']):.2f} K; last: {output['T_d']['values'][-1]:.2f} K)",color='darkblue')
     ax.set_xlabel(f"years")
     ax.legend()
     ax = axs[1]
-    ax.plot(times,output['C_s']['values'],label=f"surface ocean ({output['C_s']['values'][-1]:.0f} Gt)", color='lightblue')
-    ax.plot(times,output['C_d']['values'],label=f"deep ocean ({output['C_d']['values'][-1]:.0f} Gt)", color='darkblue')
-    ax.plot(times,output['C_l']['values'],label=f"land ({output['C_l']['values'][-1]:.0f} Gt)", color='green')
-    ax.plot(times,output['C_a']['values'],label=f"atmosphere ({output['C_a']['values'][-1]:.0f} Gt)", color='red')
+    ax.plot(times,output['C_s']['values'],label=f"surface ocean (last: {output['C_s']['values'][-1]:.0f} Gt)", color='lightblue')
+    ax.plot(times,output['C_d']['values'],label=f"deep ocean (last: {output['C_d']['values'][-1]:.0f} Gt)", color='darkblue')
+    ax.plot(times,output['C_l']['values'],label=f"land (last: {output['C_l']['values'][-1]:.0f} Gt)", color='green')
+    ax.plot(times,output['C_a']['values'],label=f"atmosphere (last: {output['C_a']['values'][-1]:.0f} Gt)", color='red')
     ax.set_xlabel(f"time step : {step_length} years")
-    # ax.set_ylim((0,2000))
+    # ax.set_ylim((0,1000))
     # ax.set_xlim((0,2000))
     # ax.set_ylim((-10,100))
     ax.legend()
